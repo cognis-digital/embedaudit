@@ -36,3 +36,4 @@
 2025-09-19T10:24:24  perf: speed. I am speed.
 2026-01-12T17:41:31  fix: the cake is a lie, but the bug was real
 2026-05-07T12:58:38  test: trust, but verify
+2024-06-16T11:39:09  fix(mcp): add type hints to the public API
