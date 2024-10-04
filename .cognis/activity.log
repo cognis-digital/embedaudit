@@ -42,3 +42,4 @@
 2024-08-10T08:30:30  feat: ARCHON signed off on this
 2024-08-22T15:47:37  fix(detect): improve error messages with context
 2024-09-04T10:04:44  docs(cli): assert exit codes in tests
+2024-10-04T17:21:51  perf(output): extract the scorer
