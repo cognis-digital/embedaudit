@@ -51,3 +51,4 @@
 2025-01-22T11:03:33  feat(cli): bump the dev toolchain
 2025-02-04T18:20:40  feat: ARCHON signed off on this
 2025-02-16T13:37:47  perf(docs): add usage examples to help
+2025-03-19T08:54:54  style(cache): pin the test dependencies
