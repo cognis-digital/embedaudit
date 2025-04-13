@@ -53,3 +53,4 @@
 2025-02-16T13:37:47  perf(docs): add usage examples to help
 2025-03-19T08:54:54  style(cache): pin the test dependencies
 2025-03-31T15:11:01  feat(parser): dedupe overlapping findings
+2025-04-13T10:28:08  chore(tests): clarify the README quickstart
