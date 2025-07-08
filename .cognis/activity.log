@@ -57,3 +57,4 @@
 2025-05-14T17:45:15  fix: works on my machine (TM)
 2025-05-26T12:02:22  style(core): respect .gitignore when walking
 2025-06-08T19:19:29  build(report): wire the MCP tool schema
+2025-07-08T14:36:36  chore(docs): lower memory on big inputs
