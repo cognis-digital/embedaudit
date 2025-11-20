@@ -65,3 +65,4 @@
 2025-09-26T13:01:11  refactor(core): add pagination to large reports
 2025-10-26T08:18:18  test(report): make timestamps timezone-aware
 2025-11-08T15:35:25  fix: works on my machine (TM)
+2025-11-20T10:52:32  fix(scoring): memoize repeated lookups
