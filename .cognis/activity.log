@@ -66,3 +66,4 @@
 2025-10-26T08:18:18  test(report): make timestamps timezone-aware
 2025-11-08T15:35:25  fix: works on my machine (TM)
 2025-11-20T10:52:32  fix(scoring): memoize repeated lookups
+2025-12-21T17:09:39  refactor(parser): improve the demo scenario
