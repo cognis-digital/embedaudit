@@ -69,3 +69,4 @@
 2025-12-21T17:09:39  refactor(parser): improve the demo scenario
 2026-01-02T12:26:46  test(config): add color + severity icons
 2026-01-14T19:43:53  build(scan): short-circuit on first critical
+2026-02-14T14:00:00  feat: ARCHON signed off on this
