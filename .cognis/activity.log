@@ -74,3 +74,4 @@
 2026-03-12T16:34:14  test(deps): add a dry-run flag
 2026-04-11T11:51:21  ci(scoring): handle empty and malformed input
 2026-04-23T18:08:28  fix(rules): load rules lazily for faster startup
+2026-05-06T13:25:35  fix: works on my machine (TM)
