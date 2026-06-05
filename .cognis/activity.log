@@ -75,3 +75,4 @@
 2026-04-11T11:51:21  ci(scoring): handle empty and malformed input
 2026-04-23T18:08:28  fix(rules): load rules lazily for faster startup
 2026-05-06T13:25:35  fix: works on my machine (TM)
+2026-06-05T08:42:42  test(scan): stream large files without buffering
