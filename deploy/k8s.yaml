@@ -1,0 +1,23 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata: { name: embedaudit, labels: { app: embedaudit } }
+spec:
+  replicas: 1
+  selector: { matchLabels: { app: embedaudit } }
+  template:
+    metadata: { labels: { app: embedaudit } }
+    spec:
+      containers:
+        - name: embedaudit
+          image: ghcr.io/cognis-digital/embedaudit:latest
+          ports: [{ containerPort: 8000 }]
+          resources:
+            requests: { cpu: "50m", memory: "64Mi" }
+            limits: { cpu: "500m", memory: "256Mi" }
+---
+apiVersion: v1
+kind: Service
+metadata: { name: embedaudit }
+spec:
+  selector: { app: embedaudit }
+  ports: [{ port: 80, targetPort: 8000 }]
