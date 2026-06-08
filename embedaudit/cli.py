@@ -1,38 +1,103 @@
-"""EMBEDAUDIT command-line interface."""
+"""Command-line interface for EMBEDAUDIT."""
+
 from __future__ import annotations
-import argparse, sys
-from embedaudit.core import scan, to_json, TOOL_NAME, TOOL_VERSION
 
-def main(argv=None) -> int:
-    ap = argparse.ArgumentParser(prog="embedaudit", description="EMBEDAUDIT — Cognis Neural Suite")
-    ap.add_argument("--version", action="version", version=f"{TOOL_NAME} {TOOL_VERSION}")
-    sub = ap.add_subparsers(dest="cmd")
-    s = sub.add_parser("scan", help="scan a file or directory")
-    s.add_argument("target")
-    s.add_argument("--format", choices=["table", "json"], default="table")
-    s.add_argument("--fail-on", choices=["critical", "high", "medium", "low"], default=None)
-    sub.add_parser("mcp", help="run as an MCP server")
-    args = ap.parse_args(argv)
+import argparse
+import json
+import sys
+from typing import Any
 
-    if args.cmd == "mcp":
-        from embedaudit.mcp_server import serve
-        return serve()
-    if args.cmd == "scan":
-        res = scan(args.target)
-        if args.format == "json":
-            print(to_json(res))
-        else:
-            if not res.findings:
-                print(f"[{TOOL_NAME}] no findings in {args.target}")
-            for f in res.findings:
-                print(f"  [{f.severity.upper():8}] {f.id}  {f.title}  ({f.where})")
-            print(f"\n{len(res.findings)} findings · risk score {res.score} · {res.elapsed_ms}ms")
-        order = {"critical": 4, "high": 3, "medium": 2, "low": 1}
-        if args.fail_on and any(order.get(f.severity, 0) >= order[args.fail_on] for f in res.findings):
+from . import TOOL_NAME, TOOL_VERSION
+from .core import AuditError, AuditResult, audit_store, drift_report, load_jsonl
+
+
+def _print_table(result: AuditResult, title: str) -> None:
+    print(f"== {title} ==")
+    print(f"records   : {result.record_count}")
+    print(f"dimension : {result.dimension}")
+    print(f"status    : {'OK' if result.ok else 'FAIL'}")
+    if result.stats:
+        print("stats     :")
+        for k, v in result.stats.items():
+            if isinstance(v, float):
+                print(f"  {k:<22} {v:.4f}")
+            else:
+                print(f"  {k:<22} {v}")
+    if not result.findings:
+        print("findings  : none")
+        return
+    print("findings  :")
+    order = {"critical": 0, "warning": 1, "info": 2}
+    for f in sorted(result.findings, key=lambda x: order.get(x.severity, 9)):
+        print(f"  [{f.severity.upper():<8}] {f.code}: {f.message}")
+
+
+def _emit(result: AuditResult, fmt: str, title: str) -> None:
+    if fmt == "json":
+        print(json.dumps(result.to_dict(), indent=2))
+    else:
+        _print_table(result, title)
+
+
+def build_parser() -> argparse.ArgumentParser:
+    parser = argparse.ArgumentParser(
+        prog=TOOL_NAME,
+        description="Embedding / vector-store drift and poisoning audit.",
+    )
+    parser.add_argument(
+        "--version", action="version",
+        version=f"{TOOL_NAME} {TOOL_VERSION}",
+    )
+    parser.add_argument(
+        "--format", choices=("table", "json"), default="table",
+        help="output format (default: table)",
+    )
+    sub = parser.add_subparsers(dest="command", required=True)
+
+    p_audit = sub.add_parser(
+        "audit", help="audit a single store snapshot (JSONL of vectors)")
+    p_audit.add_argument("snapshot", help="path to JSONL embedding snapshot")
+    p_audit.add_argument("--dup-threshold", type=float, default=0.999)
+    p_audit.add_argument("--domination-share", type=float, default=0.30)
+
+    p_drift = sub.add_parser(
+        "drift", help="compare a baseline snapshot against a current snapshot")
+    p_drift.add_argument("baseline", help="trusted baseline JSONL snapshot")
+    p_drift.add_argument("current", help="current JSONL snapshot to compare")
+    p_drift.add_argument("--drift-threshold", type=float, default=0.15)
+
+    return parser
+
+
+def main(argv: list[str] | None = None) -> int:
+    parser = build_parser()
+    args = parser.parse_args(argv)
+    fmt: str = args.format
+
+    try:
+        if args.command == "audit":
+            records = load_jsonl(args.snapshot)
+            result = audit_store(
+                records,
+                dup_threshold=args.dup_threshold,
+                domination_share=args.domination_share,
+            )
+            _emit(result, fmt, f"AUDIT {args.snapshot}")
+        elif args.command == "drift":
+            baseline = load_jsonl(args.baseline)
+            current = load_jsonl(args.current)
+            result = drift_report(
+                baseline, current, drift_threshold=args.drift_threshold)
+            _emit(result, fmt, "DRIFT baseline -> current")
+        else:  # pragma: no cover - argparse guards this
+            parser.error(f"unknown command {args.command!r}")
             return 2
-        return 0
-    ap.print_help()
-    return 0
+    except (AuditError, FileNotFoundError, OSError) as exc:
+        print(f"error: {exc}", file=sys.stderr)
+        return 2
 
-if __name__ == "__main__":
-    sys.exit(main())
+    return 0 if result.ok else 1
+
+
+if __name__ == "__main__":  # pragma: no cover
+    raise SystemExit(main())
