@@ -16,7 +16,7 @@
 </div>
 
 ```bash
-pip install cognis-embedaudit
+pip install "git+https://github.com/cognis-digital/embedaudit.git"
 embedaudit scan .            # → prioritized findings in seconds
 ```
 
@@ -48,7 +48,7 @@ RAG ops niche
 ## Quick start
 
 ```bash
-pip install cognis-embedaudit
+pip install "git+https://github.com/cognis-digital/embedaudit.git"
 embedaudit --version
 embedaudit scan .                       # scan current project
 embedaudit scan . --format json         # machine-readable
