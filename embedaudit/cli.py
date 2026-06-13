@@ -5,7 +5,6 @@ from __future__ import annotations
 import argparse
 import json
 import sys
-from typing import Any
 
 from . import TOOL_NAME, TOOL_VERSION
 from .core import AuditError, AuditResult, audit_store, drift_report, load_jsonl
