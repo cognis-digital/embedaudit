@@ -34,3 +34,6 @@ embedaudit = "embedaudit.cli:main"
 
 [tool.hatch.build.targets.wheel]
 packages = ["embedaudit"]
+
+[tool.hatch.metadata]
+allow-direct-references = true
