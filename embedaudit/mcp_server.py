@@ -1,6 +1,10 @@
-"""EMBEDAUDIT MCP server — exposes scan() as an MCP tool for Cognis.Studio."""
+"""EMBEDAUDIT MCP server — exposes audit() as an MCP tool for Cognis.Studio."""
 from __future__ import annotations
-from embedaudit.core import scan, to_json
+
+import json
+
+from embedaudit.core import AuditError, audit_store, load_jsonl
+
 
 def serve() -> int:
     """Start an MCP stdio server. Requires the optional 'mcp' extra:
@@ -16,7 +20,12 @@ def serve() -> int:
     @app.tool()
     def embedaudit_scan(target: str) -> str:
         """Embedding / vector-store drift and poisoning audit. Returns JSON findings."""
-        return to_json(scan(target))
+        try:
+            records = load_jsonl(target)
+            result = audit_store(records)
+        except (AuditError, FileNotFoundError, OSError) as exc:
+            return json.dumps({"error": str(exc)})
+        return json.dumps(result.to_dict())
 
     app.run()
     return 0

@@ -112,9 +112,16 @@ def _mean_vector(vectors: list[list[float]], dim: int) -> list[float]:
     return [x / n for x in acc]
 
 
-def _quantize_key(v: list[float], buckets: int = 1000) -> tuple[int, ...]:
-    """Coarse hash for exact/near-duplicate detection via bucketed coords."""
-    return tuple(int(round(x * buckets)) for x in v)
+def _quantize_key(v: list[float], buckets: int = 1000) -> tuple[int, ...] | None:
+    """Coarse hash for exact/near-duplicate detection via bucketed coords.
+
+    Returns None if the vector contains NaN or Inf values (those are already
+    flagged as INVALID_VALUE and must be excluded from duplicate detection).
+    """
+    try:
+        return tuple(int(round(x * buckets)) for x in v)
+    except (ValueError, OverflowError):
+        return None
 
 
 # --------------------------------------------------------------------------- #
@@ -130,6 +137,8 @@ def audit_store(
     domination_share: float = 0.30,
 ) -> AuditResult:
     """Audit a single embedding store snapshot for integrity + poisoning."""
+    if not records:
+        raise AuditError("audit_store requires at least one record")
     res = AuditResult(record_count=len(records))
 
     # --- dimension consistency ---
@@ -190,6 +199,8 @@ def audit_store(
     exact_dups: list[tuple[str, str]] = []
     for r in records:
         key = _quantize_key(r.vector)
+        if key is None:  # NaN/Inf vector — already flagged as INVALID_VALUE
+            continue
         if key in seen:
             exact_dups.append((seen[key], r.id))
         else:

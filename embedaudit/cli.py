@@ -38,6 +38,19 @@ def _emit(result: AuditResult, fmt: str, title: str) -> None:
         _print_table(result, title)
 
 
+def _fraction(value: str) -> float:
+    """argparse type: float in [0, 1]."""
+    try:
+        v = float(value)
+    except ValueError:
+        raise argparse.ArgumentTypeError(f"{value!r} is not a valid number")
+    if not (0.0 <= v <= 1.0):
+        raise argparse.ArgumentTypeError(
+            f"{value!r} must be between 0.0 and 1.0 (got {v})"
+        )
+    return v
+
+
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
         prog=TOOL_NAME,
@@ -56,14 +69,14 @@ def build_parser() -> argparse.ArgumentParser:
     p_audit = sub.add_parser(
         "audit", help="audit a single store snapshot (JSONL of vectors)")
     p_audit.add_argument("snapshot", help="path to JSONL embedding snapshot")
-    p_audit.add_argument("--dup-threshold", type=float, default=0.999)
-    p_audit.add_argument("--domination-share", type=float, default=0.30)
+    p_audit.add_argument("--dup-threshold", type=_fraction, default=0.999)
+    p_audit.add_argument("--domination-share", type=_fraction, default=0.30)
 
     p_drift = sub.add_parser(
         "drift", help="compare a baseline snapshot against a current snapshot")
     p_drift.add_argument("baseline", help="trusted baseline JSONL snapshot")
     p_drift.add_argument("current", help="current JSONL snapshot to compare")
-    p_drift.add_argument("--drift-threshold", type=float, default=0.15)
+    p_drift.add_argument("--drift-threshold", type=_fraction, default=0.15)
 
     return parser
 

@@ -139,6 +139,68 @@ class TestCLI(unittest.TestCase):
         rc = main(["audit", "/nonexistent/path/x.jsonl"])
         self.assertEqual(rc, 2)
 
+    def test_bad_dup_threshold_exits_nonzero(self):
+        """Out-of-range --dup-threshold should cause a non-zero exit (argparse error)."""
+        path = _write([{"id": "a", "vector": [1.0, 0.0]}])
+        try:
+            with self.assertRaises(SystemExit) as ctx:
+                main(["audit", "--dup-threshold", "1.5", path])
+            self.assertEqual(ctx.exception.code, 2)
+        finally:
+            os.remove(path)
+
+    def test_bad_drift_threshold_exits_nonzero(self):
+        """Negative --drift-threshold should cause a non-zero exit (argparse error)."""
+        path = _write([{"id": "a", "vector": [1.0, 0.0]}])
+        try:
+            with self.assertRaises(SystemExit) as ctx:
+                main(["drift", "--drift-threshold", "-0.1", path, path])
+            self.assertEqual(ctx.exception.code, 2)
+        finally:
+            os.remove(path)
+
+
+class TestHardenedEdgeCases(unittest.TestCase):
+    def test_audit_store_empty_records_raises(self):
+        """audit_store([]) must raise AuditError, not crash with ValueError."""
+        from embedaudit.core import AuditError, audit_store
+        with self.assertRaises(AuditError):
+            audit_store([])
+
+    def test_audit_store_nan_vector_does_not_crash(self):
+        """A vector with NaN must be flagged INVALID_VALUE without crashing."""
+        recs = [
+            Record("a", [1.0, 0.0]),
+            Record("b", [float("nan"), 0.0]),
+            Record("c", [0.0, 1.0]),
+        ]
+        res = audit_store(recs)
+        codes = [f.code for f in res.findings]
+        self.assertIn("INVALID_VALUE", codes)
+
+    def test_audit_store_inf_vector_does_not_crash(self):
+        """A vector with Inf must be flagged INVALID_VALUE without crashing."""
+        recs = [
+            Record("a", [1.0, 0.0]),
+            Record("b", [float("inf"), 0.0]),
+            Record("c", [0.0, 1.0]),
+        ]
+        res = audit_store(recs)
+        codes = [f.code for f in res.findings]
+        self.assertIn("INVALID_VALUE", codes)
+
+    def test_mcp_server_importable(self):
+        """mcp_server must import without AttributeError (no stale API references)."""
+        import importlib
+        import embedaudit.mcp_server as mod
+        importlib.reload(mod)  # ensure it re-executes the top-level import
+        self.assertTrue(callable(mod.serve))
+
+    def test_drift_report_empty_snapshots_returns_finding(self):
+        """drift_report on empty lists should return a finding, not crash."""
+        res = drift_report([], [])
+        self.assertGreater(len(res.findings), 0)
+
 
 if __name__ == "__main__":
     unittest.main()
