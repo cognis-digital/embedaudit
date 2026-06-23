@@ -6,6 +6,16 @@
 
 _Always-current feeds, live web-search queries, and keyless APIs for real-time monitoring. Ingest at runtime with `livesearch.py`._
 
+> **Edge / air-gap feed catalog.** For poison-content enrichment, `embedaudit`
+> also bundles an offline, keyless feed ingester at `embedaudit/feeds/`
+> (`datafeeds.py` + `data_feeds_2026.json`). It caches real threat-intel
+> (abuse.ch URLhaus/ThreatFox, OFAC, MITRE ATT&CK, …) to disk and serves it
+> `offline=True`, and can `snapshot-export`/`snapshot-import` the cache for
+> sneakernet into a disconnected enclave. CVE/vulnerability feeds (OSV/NVD/KEV)
+> are deliberately **not** used — they are irrelevant to embedding integrity.
+> Run `embedaudit feeds` to list the relevant catalog, or
+> `embedaudit audit snapshot.jsonl --enrich-feeds` to apply it.
+
 ### Ai
 - **feed** · https://huggingface.co/blog/feed.xml
 - **feed** · https://openai.com/news/rss.xml

@@ -35,5 +35,8 @@ embedaudit = "embedaudit.cli:main"
 [tool.hatch.build.targets.wheel]
 packages = ["embedaudit"]
 
+[tool.hatch.build.targets.wheel.force-include]
+"embedaudit/feeds/data_feeds_2026.json" = "embedaudit/feeds/data_feeds_2026.json"
+
 [tool.hatch.metadata]
 allow-direct-references = true

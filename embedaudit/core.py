@@ -8,8 +8,29 @@ from __future__ import annotations
 
 import json
 import math
+import os
 from dataclasses import dataclass, field, asdict
 from typing import Any, Iterable
+
+TOOL_NAME = "embedaudit"
+
+
+def _read_version() -> str:
+    """Read the repo VERSION file if present, else a sane default."""
+    here = os.path.dirname(os.path.abspath(__file__))
+    for candidate in (os.path.join(here, "..", "VERSION"),
+                      os.path.join(here, "VERSION")):
+        try:
+            with open(candidate, "r", encoding="utf-8") as fh:
+                v = fh.read().strip()
+                if v:
+                    return v
+        except OSError:
+            continue
+    return "1.3.3"
+
+
+TOOL_VERSION = _read_version()
 
 
 class AuditError(Exception):
@@ -112,9 +133,21 @@ def _mean_vector(vectors: list[list[float]], dim: int) -> list[float]:
     return [x / n for x in acc]
 
 
-def _quantize_key(v: list[float], buckets: int = 1000) -> tuple[int, ...]:
-    """Coarse hash for exact/near-duplicate detection via bucketed coords."""
-    return tuple(int(round(x * buckets)) for x in v)
+def _quantize_key(v: list[float], buckets: int = 1000) -> tuple[Any, ...]:
+    """Coarse hash for exact/near-duplicate detection via bucketed coords.
+
+    NaN/Inf coordinates (already flagged as INVALID_VALUE) are kept as sentinels
+    rather than crashing — a poisoned snapshot must never break the audit.
+    """
+    key: list[Any] = []
+    for x in v:
+        if math.isnan(x):
+            key.append("nan")
+        elif math.isinf(x):
+            key.append("inf+" if x > 0 else "inf-")
+        else:
+            key.append(int(round(x * buckets)))
+    return tuple(key)
 
 
 # --------------------------------------------------------------------------- #
@@ -128,8 +161,15 @@ def audit_store(
     outlier_z: float = 3.0,
     norm_z: float = 4.0,
     domination_share: float = 0.30,
+    enrich_feeds: bool = False,
 ) -> AuditResult:
-    """Audit a single embedding store snapshot for integrity + poisoning."""
+    """Audit a single embedding store snapshot for integrity + poisoning.
+
+    Set ``enrich_feeds=True`` to additionally check each record's text against
+    cached, offline threat-intel feeds (known-bad URLs/domains). This is purely
+    additive and degrades to a no-op when no feed cache is present, so the audit
+    always runs fully offline by default.
+    """
     res = AuditResult(record_count=len(records))
 
     # --- dimension consistency ---
@@ -239,6 +279,21 @@ def audit_store(
             f"store (retrieval-domination / poisoning risk)",
             {"ids": ids[:20], "share": share},
         ))
+
+    # --- optional offline threat-intel enrichment (additive, no-op if no cache)
+    if enrich_feeds:
+        try:
+            from embedaudit.feeds_bridge import scan_records_for_known_bad
+            hits = scan_records_for_known_bad(records, offline=True)
+        except Exception:  # pragma: no cover - bridge is best-effort
+            hits = []
+        if hits:
+            res.findings.append(Finding(
+                "critical", "KNOWN_BAD_CONTENT",
+                f"{len(hits)} record(s) carry a known-bad indicator from cached "
+                f"threat-intel feeds (content-poisoning)",
+                {"hits": hits[:20]},
+            ))
 
     res.stats = {
         "mean_norm": mean_norm,

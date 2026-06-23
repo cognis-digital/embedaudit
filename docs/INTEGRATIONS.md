@@ -8,7 +8,7 @@ This guide lists the supported integration surfaces. Where a surface is marked
 
 | Surface | How | Status |
 |---|---|---|
-| **CLI / exit codes** | `--fail-on <severity>` for CI gates; JSON on stdout | ✅ |
+| **CLI / exit codes** | non-zero exit on any `critical` finding for CI gates; JSON on stdout | ✅ |
 | **JSON / SARIF** | machine-readable findings; SARIF for code-scanning | ✅ |
 | **MCP server** | `<tool> mcp` exposes capabilities to agents/Cognis.Studio | ✅ |
 | **REST / Webhooks** | `integrations/webhook.py` posts findings to any endpoint | ✅ |
@@ -25,14 +25,14 @@ This guide lists the supported integration surfaces. Where a surface is marked
 ## Quick examples
 
 ```bash
-# CI gate (GitHub Actions, GitLab CI, Jenkins, etc.)
-<tool> scan . --format sarif --out results.sarif --fail-on high
+# CI gate (GitHub Actions, GitLab CI, Jenkins, etc.) — exits 1 on a critical finding
+embedaudit audit snapshot.jsonl --format sarif > results.sarif
 
 # Stream findings to a webhook / SIEM forwarder
-<tool> scan . --format json | python integrations/webhook.py --url "$COGNIS_WEBHOOK_URL"
+embedaudit audit snapshot.jsonl --format json | python integrations/webhook.py --url "$COGNIS_WEBHOOK_URL"
 
 # Use from an AI agent over MCP
-<tool> mcp
+embedaudit mcp
 ```
 
 ## Configuration

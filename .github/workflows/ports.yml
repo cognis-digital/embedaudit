@@ -1,0 +1,49 @@
+name: ports
+on: [push, pull_request]
+permissions:
+  contents: read
+jobs:
+  go:
+    runs-on: ubuntu-latest
+    defaults: { run: { working-directory: ports/go } }
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version: "1.21"
+      - run: go vet ./...
+      - run: go test ./... -v
+      - run: go build -o /tmp/embedaudit-go .
+      - name: smoke (poisoned snapshot exits 1)
+        run: |
+          if /tmp/embedaudit-go audit ../../demos/01-basic/store_snapshot.jsonl; then
+            echo "expected non-zero exit on poisoned snapshot"; exit 1
+          fi
+
+  rust:
+    runs-on: ubuntu-latest
+    defaults: { run: { working-directory: ports/rust } }
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - run: cargo test
+      - run: cargo build --release
+      - name: smoke (poisoned snapshot exits 1)
+        run: |
+          if ./target/release/embedaudit audit ../../demos/01-basic/store_snapshot.jsonl; then
+            echo "expected non-zero exit on poisoned snapshot"; exit 1
+          fi
+
+  node:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+      - run: node --test ports/javascript/test.js
+      - name: smoke (poisoned snapshot exits 1)
+        run: |
+          if node ports/javascript/index.js audit demos/01-basic/store_snapshot.jsonl; then
+            echo "expected non-zero exit on poisoned snapshot"; exit 1
+          fi

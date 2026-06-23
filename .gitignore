@@ -6,3 +6,7 @@ dist/
 build/
 .pytest_cache/
 .DS_Store
+# edge feed cache (sneakernet artifact, never commit)
+.cache/cognis-feeds/
+*.bulk.json
+feeds.tar.gz

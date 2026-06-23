@@ -36,7 +36,7 @@
 
 pip install cognis-embedaudit
 
-embedaudit scan .            # → prioritized findings in seconds
+embedaudit audit snapshot.jsonl     # → prioritized poisoning/drift findings in ms
 
 ```
 
@@ -73,7 +73,7 @@ embedaudit scan .            # → prioritized findings in seconds
 
 
 
-- [Why embedaudit?](#why) · [Features](#features) · [Quick start](#quick-start) · [Example](#example) · [Architecture](#architecture) · [AI stack](#ai-stack) · [How it compares](#how-it-compares) · [Integrations](#integrations) · [Install anywhere](#install-anywhere) · [Related](#related) · [Contributing](#contributing)
+- [Why embedaudit?](#why) · [Features](#features) · [Quick start](#quick-start) · [Example](#example) · [Architecture](#architecture) · [AI stack](#ai-stack) · [How it compares](#how-it-compares) · [Edge / air-gap](#edge) · [Scope & safety](#scope) · [Integrations](#integrations) · [Install anywhere](#install-anywhere) · [Related](#related) · [Contributing](#contributing)
 
 
 
@@ -83,11 +83,19 @@ embedaudit scan .            # → prioritized findings in seconds
 
 
 
-RAG ops niche
+RAG retrieval is only as trustworthy as the vector store behind it — and that
+store is a soft target. A handful of crafted "universal" documents can dominate
+top-k retrieval; a silent embedding-model swap shifts the whole space; a broken
+embed pipeline quietly writes zero/NaN vectors; duplicates bloat the index. None
+of this shows up in a row count.
 
 
 
-`embedaudit` is single-purpose, scriptable, and self-hostable: point it at a target, get prioritized results in the format your workflow already speaks (table · JSON · SARIF), gate CI on it, and let agents drive it over MCP.
+`embedaudit` is the integrity check for that store. It's single-purpose,
+scriptable, and self-hostable: point it at a JSONL snapshot, get prioritized
+findings in the format your workflow already speaks (table · JSON · SARIF · CSV),
+gate CI on the exit code, and let agents drive it over MCP. Pure standard
+library — no model, no GPU, no network.
 
 
 
@@ -96,20 +104,48 @@ RAG ops niche
 
 
 <a name="features"></a>
+<a name="findings"></a>
 
 ## Features
 
 
 
-- ✅ Load Jsonl
+`embedaudit` reads a **JSONL snapshot of your vector store** — one
+`{"id", "vector", "text"}` record per line, exported from FAISS / pgvector /
+Chroma / Pinecone / Weaviate / Qdrant or any pipeline — and runs a pure-math
+integrity + poisoning audit. No model, no GPU, no network.
 
-- ✅ Audit Store
 
-- ✅ Drift Report
 
-- ✅ Runs on Linux/macOS/Windows · Docker · devcontainer
+- ✅ **`audit`** a single snapshot for poisoning & corruption:
 
-- ✅ Ports in Python, JavaScript, Go, and Rust (`ports/`)
+  - `ZERO_VECTOR` — un-embeddable / failed-embed records (critical)
+
+  - `INVALID_VALUE` — NaN / Inf coordinates (critical)
+
+  - `DIM_MISMATCH` — mixed dimensions = silent model swap / corrupt write (critical)
+
+  - `RETRIEVAL_DOMINATION` — a near-identical cluster owning a large share of the store → top-k hijack / universal-poison docs (critical)
+
+  - `DUPLICATE_VECTOR` — index bloat / retrieval flooding (warning)
+
+  - `NORM_OUTLIER` / `OUTLIER_VECTOR` — mis-scaled or off-topic injected vectors (warning)
+
+- ✅ **`drift`** a current snapshot against a trusted baseline — centroid distance + per-dimension shift → `DRIFT` / `RECORD_LOSS` (catches silent model swaps on an append-only store)
+
+- ✅ **Output formats**: `table` (human) · `json` · **`sarif`** (GitHub code-scanning) · `csv` (SIEM / spreadsheets)
+
+- ✅ **Deterministic CI gate**: non-zero exit when any `critical` finding is present
+
+- ✅ **Edge / air-gap**: optional offline threat-intel enrichment (`--enrich-feeds`) from a cached, keyless feed catalog — see [Edge / air-gap](#edge)
+
+- ✅ **`embedaudit-emit`** forwards findings to STIX/MISP/Sigma/Splunk/Elastic/Slack/webhook via [cognis-connect](https://github.com/cognis-digital/cognis-connect)
+
+- ✅ **MCP server** (`embedaudit mcp`) exposes `audit` / `drift` as tools
+
+- ✅ Runs on Linux/macOS/Windows · Docker · devcontainer · pure stdlib (Python 3.10+)
+
+- ✅ Verified ports in **Python, JavaScript/Node, Go, and Rust** (`ports/`), CI-tested on every push
 
 
 
@@ -129,11 +165,27 @@ pip install cognis-embedaudit
 
 embedaudit --version
 
-embedaudit scan .                       # scan current project
+embedaudit audit snapshot.jsonl                 # human table; exits 1 on critical
 
-embedaudit scan . --format json         # machine-readable
+embedaudit audit snapshot.jsonl --format json   # machine-readable
 
-embedaudit scan . --fail-on high        # CI gate (non-zero exit)
+embedaudit audit snapshot.jsonl --format sarif  # GitHub code-scanning
+
+embedaudit drift baseline.jsonl current.jsonl   # poisoning / model-swap vs baseline
+
+```
+
+
+
+Snapshot format — one JSON object per line:
+
+
+
+```jsonl
+
+{"id": "doc-1", "vector": [0.91, 0.10, 0.05, 0.02], "text": "How do I reset my password?"}
+
+{"id": "doc-2", "vector": [0.12, 0.88, 0.07, 0.03], "text": "Billing invoice for March"}
 
 ```
 
@@ -149,17 +201,102 @@ embedaudit scan . --fail-on high        # CI gate (non-zero exit)
 
 
 
+Audit the bundled poisoned demo store (`demos/01-basic/store_snapshot.jsonl` —
+11 records: clean docs, one failed embed, and a 5-vector poison cluster):
+
+
+
 ```text
 
-$ embedaudit scan .
+$ embedaudit audit demos/01-basic/store_snapshot.jsonl
 
-  [HIGH    ] EMB-001  example finding             (./src/app.py)
+== AUDIT demos/01-basic/store_snapshot.jsonl ==
 
-  [MEDIUM  ] EMB-002  another signal              (./config.yaml)
+records   : 11
+
+dimension : 4
+
+status    : FAIL
+
+stats     :
+
+  mean_norm              0.8815
+
+  std_norm               0.2816
+
+  duplicate_pairs        1
+
+  largest_cluster        5
+
+  largest_cluster_share  0.4545
+
+findings  :
+
+  [CRITICAL] ZERO_VECTOR: 1 zero-norm vector(s) (un-embeddable / corrupt)
+
+  [CRITICAL] RETRIEVAL_DOMINATION: 5 near-identical vectors form 45% of the store (retrieval-domination / poisoning risk)
+
+  [WARNING ] DUPLICATE_VECTOR: 1 duplicate vector pair(s) detected (index bloat / retrieval flooding)
+
+risk score: 8
+
+$ echo $?
+
+1
+
+```
 
 
 
-  2 findings · risk score 5 · 38ms
+Same audit as JSON (truncated):
+
+
+
+```json
+
+{
+
+  "ok": false,
+
+  "record_count": 11,
+
+  "dimension": 4,
+
+  "findings": [
+
+    { "severity": "critical", "code": "ZERO_VECTOR",
+
+      "message": "1 zero-norm vector(s) (un-embeddable / corrupt)",
+
+      "detail": { "ids": ["broken-1"] } },
+
+    { "severity": "critical", "code": "RETRIEVAL_DOMINATION",
+
+      "message": "5 near-identical vectors form 45% of the store (...)",
+
+      "detail": { "ids": ["poison-1", "poison-2", "..."], "share": 0.4545 } }
+
+  ]
+
+}
+
+```
+
+
+
+Catch a silent poisoning / model swap by comparing against a trusted baseline:
+
+
+
+```text
+
+$ embedaudit drift baseline.jsonl current.jsonl
+
+== DRIFT baseline -> current ==
+
+findings  :
+
+  [CRITICAL] DRIFT: Drift score 1.000 (centroid_dist=1.000, dims_drifted=100%)
 
 ```
 
@@ -177,9 +314,18 @@ $ embedaudit scan .
 
 ```mermaid
 flowchart LR
-  IN[target / manifest] --> P[embedaudit<br/>checks + rules]
-  P --> OUT[findings (JSON / SARIF)]
+  SNAP[JSONL snapshot<br/>id · vector · text] --> AUD[embedaudit<br/>audit / drift]
+  FEEDS[(cached offline<br/>threat-intel feeds)] -. optional --enrich-feeds .-> AUD
+  AUD --> OUT[findings<br/>table · JSON · SARIF · CSV]
+  OUT --> GATE[CI gate<br/>exit 1 on critical]
+  OUT --> EMIT[embedaudit-emit<br/>STIX · MISP · Sigma · SIEM · Slack]
 ```
+
+
+
+The core math (`norm`, cosine, centroid, greedy clustering) is hand-rolled in
+pure standard library, so the audit runs anywhere Python 3.10+ runs — no NumPy,
+no model, no network.
 
 
 
@@ -199,7 +345,7 @@ flowchart LR
 
 - **MCP server** — `embedaudit mcp` (Claude Desktop, Cursor, Cognis.Studio, [uncensored-fleet](https://github.com/cognis-digital/uncensored-fleet))
 
-- **OpenAI-compatible / JSON** — pipe `embedaudit scan . --format json` into any agent or LLM
+- **OpenAI-compatible / JSON** — pipe `embedaudit audit snapshot.jsonl --format json` into any agent or LLM
 
 - **LangChain · CrewAI · AutoGen · LlamaIndex** — wrap the CLI/JSON as a tool in one line
 
@@ -236,6 +382,87 @@ flowchart LR
 
 
 *Built in the spirit of **RAG security**, re-framed the Cognis way. Missing a credit? Open a PR.*
+
+
+
+<div align="right"><a href="#top">↑ back to top</a></div>
+
+
+
+<a name="edge"></a>
+
+## Edge / air-gap
+
+
+
+The core audit is **fully offline** — point it at a JSONL snapshot and it runs
+with zero network access. Optional threat-intel enrichment is designed for
+disconnected / edge / regulated gear:
+
+
+
+```bash
+
+# 1. on a connected host: pre-fetch + cache real, keyless feeds (abuse.ch, OFAC, …)
+
+python -m embedaudit.feeds.datafeeds update urlhaus threatfox spamhaus-drop
+
+python -m embedaudit.feeds.datafeeds snapshot-export feeds.tar.gz   # for sneakernet
+
+
+
+# 2. inside the air-gapped enclave: import the snapshot, then audit fully offline
+
+python -m embedaudit.feeds.datafeeds snapshot-import feeds.tar.gz
+
+embedaudit audit snapshot.jsonl --enrich-feeds                      # adds KNOWN_BAD_CONTENT
+
+embedaudit feeds                                                   # list the cached catalog
+
+```
+
+
+
+- **Keyless / offline**: the feed catalog JSON ships in the package, so
+  `embedaudit feeds` works with no network at all. Feed *contents* are cached to
+
+  disk (`COGNIS_FEEDS_CACHE`) and served `offline=True` thereafter.
+
+- **No-op by default**: with no cache present, `--enrich-feeds` adds nothing and
+  the audit stays pure-math — it never silently reaches the network at query time.
+
+- **Relevant feeds only**: enrichment uses `threat-intel` / `osint` feeds
+  (known-bad URLs/domains that a poisoned RAG doc might smuggle in its text).
+  CVE/vulnerability feeds (OSV/NVD/KEV) are **deliberately excluded** — CVEs are
+
+  irrelevant to embedding integrity.
+
+
+
+<div align="right"><a href="#top">↑ back to top</a></div>
+
+
+
+<a name="scope"></a>
+
+## Scope, authorization & safety
+
+
+
+- **Passive & offline by design.** `embedaudit` reads a snapshot file you
+  already exported. It performs **no network scanning**, sends no probes, and
+
+  makes no outbound calls during an audit.
+
+- **Authorized data only.** Audit vector stores you own or are authorized to
+  assess. The optional feed enrichment pulls **public, real** threat-intel
+  (abuse.ch, OFAC, MITRE ATT&CK, …) — no fabricated indicators, ever.
+
+- **Defensive use.** This is a data-governance / integrity tool. It is not a
+  weapon, exploit, or intrusion capability.
+
+- **Deterministic.** Findings are pure functions of the input snapshot and the
+  documented thresholds — reproducible in CI and in court.
 
 
 
