@@ -1,0 +1,3 @@
+$ embedaudit-emit --version
+
+embedaudit 1.4.0

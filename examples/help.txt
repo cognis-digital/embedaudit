@@ -1,0 +1,19 @@
+$ embedaudit-emit --help
+
+usage: embedaudit [-h] [--version] [--format {table,json,sarif,csv}]
+                  {audit,drift,feeds,mcp} ...
+
+Embedding / vector-store drift and poisoning audit.
+
+positional arguments:
+  {audit,drift,feeds,mcp}
+    audit               audit a single store snapshot (JSONL of vectors)
+    drift               compare a baseline snapshot against a current snapshot
+    feeds               list the bundled offline threat-intel feed catalog
+    mcp                 run the MCP stdio server (needs [mcp] extra)
+
+options:
+  -h, --help            show this help message and exit
+  --version             show program's version number and exit
+  --format {table,json,sarif,csv}
+                        output format (default: table)

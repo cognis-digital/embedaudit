@@ -42,6 +42,65 @@ embedaudit audit snapshot.jsonl     # → prioritized poisoning/drift findings i
 
 
 
+
+<!-- cognis:example:start -->
+## 🔎 Example output
+
+Real, reproducible output from the tool — runs offline:
+
+```console
+$ embedaudit-emit --version
+embedaudit 1.4.0
+```
+
+```console
+$ embedaudit-emit --help
+usage: embedaudit [-h] [--version] [--format {table,json,sarif,csv}]
+                  {audit,drift,feeds,mcp} ...
+
+Embedding / vector-store drift and poisoning audit.
+
+positional arguments:
+  {audit,drift,feeds,mcp}
+    audit               audit a single store snapshot (JSONL of vectors)
+    drift               compare a baseline snapshot against a current snapshot
+    feeds               list the bundled offline threat-intel feed catalog
+    mcp                 run the MCP stdio server (needs [mcp] extra)
+
+options:
+  -h, --help            show this help message and exit
+  --version             show program's version number and exit
+  --format {table,json,sarif,csv}
+                        output format (default: table)
+```
+
+```console
+$ embedaudit-emit feeds
+feed catalog (offline) — 18 relevant feed(s)
+  [threat-intel] attack-enterprise      stix   https://raw.githubusercontent.com/mitre-attack/attack-stix-data/master/enterprise-attack/enterprise-attack.json
+  [threat-intel] feodo-c2               json   https://feodotracker.abuse.ch/downloads/ipblocklist.json
+  [threat-intel] threatfox              json   https://threatfox.abuse.ch/export/json/recent/
+  [threat-intel] urlhaus                json   https://urlhaus.abuse.ch/downloads/json_recent/
+  [threat-intel] sslbl                  csv    https://sslbl.abuse.ch/blacklist/sslblacklist.csv
+  [osint       ] ofac-sdn               csv    https://www.treasury.gov/ofac/downloads/sdn.csv
+  [osint       ] gdelt                  text   http://data.gdeltproject.org/gdeltv2/lastupdate.txt
+  [osint       ] opensky-states         json   https://opensky-network.org/api/states/all
+  [threat-intel] spamhaus-drop          text   https://www.spamhaus.org/drop/drop.txt
+  [threat-intel] tor-exit-nodes         text   https://check.torproject.org/torbulkexitlist
+  [threat-intel] sslbl-ja3              csv    https://sslbl.abuse.ch/blacklist/ja3_fingerprints.csv
+  [threat-intel] urlhaus-recent         json   https://urlhaus.abuse.ch/downloads/json_recent/
+  [threat-intel] attack-mobile          stix   https://raw.githubusercontent.com/mitre-attack/attack-stix-data/master/mobile-attack/mobile-attack.json
+  [threat-intel] attack-ics             stix   https://raw.githubusercontent.com/mitre-attack/attack-stix-data/master/ics-attack/ics-attack.json
+  [osint       ] usgs-earthquakes       geojson https://earthquake.usgs.gov/fdsnws/event/1/query?format=geojson&minmagnitude=4
+  [osint       ] noaa-weather-alerts    geojson https://api.weather.gov/alerts/active
+  [osint       ] reliefweb-disasters    json   https://api.reliefweb.int/v2/disasters?appname=cognis-digital&limit=50
+  [osint       ] openfda-enforcement    json   https://api.fda.gov/drug/enforcement.json?limit=100
+```
+
+> Blocks above are real `embedaudit` output — reproduce them from a clone.
+
+<!-- cognis:example:end -->
+
 ## Usage — step by step
 
 1. **Install** the CLI:
